@@ -1,8 +1,9 @@
-﻿namespace Egs.Agent.Abstractions.Commands;
+namespace Egs.Agent.Abstractions.Commands;
 
 public enum ServerCommandType
 {
-    Start = 1,
-    Stop = 2,
-    Restart = 3
+    Install = 1,
+    Start = 2,
+    Stop = 3,
+    Restart = 4
 }

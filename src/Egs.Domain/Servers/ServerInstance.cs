@@ -1,4 +1,4 @@
-﻿namespace Egs.Domain.Servers;
+namespace Egs.Domain.Servers;
 
 public sealed class ServerInstance
 {
@@ -6,6 +6,7 @@ public sealed class ServerInstance
     public string Name { get; set; } = string.Empty;
     public string GameKey { get; set; } = string.Empty;
     public string NodeName { get; set; } = "Local";
+    public string InstallPath { get; set; } = string.Empty;
     public string Status { get; set; } = "Stopped";
     public int? ProcessId { get; set; }
     public string SettingsJson { get; set; } = "{}";

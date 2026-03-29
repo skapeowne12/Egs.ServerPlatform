@@ -1,19 +1,20 @@
-﻿using Egs.Agent.Abstractions.Commands;
-using Egs.Agent.Abstractions.Console;
-using Egs.Agent.Abstractions.Status;
+using Egs.Agent.Abstractions.Commands;
 
 namespace Egs.Agent.Windows.Services;
 
 public sealed class AgentWorker : BackgroundService
 {
     private readonly ControlPlaneClient _controlPlaneClient;
+    private readonly ServerCommandExecutor _commandExecutor;
     private readonly ILogger<AgentWorker> _logger;
 
     public AgentWorker(
         ControlPlaneClient controlPlaneClient,
+        ServerCommandExecutor commandExecutor,
         ILogger<AgentWorker> logger)
     {
         _controlPlaneClient = controlPlaneClient;
+        _commandExecutor = commandExecutor;
         _logger = logger;
     }
 
@@ -57,47 +58,6 @@ public sealed class AgentWorker : BackgroundService
             command.ServerId,
             command.Type);
 
-        await EmitLineAsync(command.ServerId, $"[{command.Type}] Command received.", ct);
-        await Task.Delay(300, ct);
-
-        await EmitLineAsync(command.ServerId, $"[{command.Type}] Validating runtime...", ct);
-        await Task.Delay(300, ct);
-
-        await EmitLineAsync(command.ServerId, $"[{command.Type}] Preparing server process...", ct);
-        await Task.Delay(300, ct);
-
-        string finalStatus = command.Type switch
-        {
-            ServerCommandType.Start => "Running",
-            ServerCommandType.Stop => "Stopped",
-            ServerCommandType.Restart => "Running",
-            _ => "Unknown"
-        };
-
-        int? processId = finalStatus == "Running"
-            ? Random.Shared.Next(1000, 99999)
-            : null;
-
-        await EmitLineAsync(command.ServerId, $"[{command.Type}] Final status: {finalStatus}", ct);
-
-        await _controlPlaneClient.PostStatusAsync(
-            new AgentServerUpdateMessage(
-                command.ServerId,
-                finalStatus,
-                processId,
-                null,
-                DateTimeOffset.UtcNow),
-            ct);
-
-        _logger.LogInformation(
-            "Completed command {CommandId} for server {ServerId}. Final status: {Status}",
-            command.CommandId,
-            command.ServerId,
-            finalStatus);
+        await _commandExecutor.ExecuteAsync(command, ct);
     }
-
-    private Task EmitLineAsync(Guid serverId, string line, CancellationToken ct) =>
-        _controlPlaneClient.PostConsoleLineAsync(
-            new ConsoleLineMessage(serverId, DateTimeOffset.UtcNow, line),
-            ct);
 }

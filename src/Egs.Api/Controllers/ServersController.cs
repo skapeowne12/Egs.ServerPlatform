@@ -1,4 +1,4 @@
-﻿using Egs.Application.Servers;
+using Egs.Application.Servers;
 using Egs.Contracts.Servers;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,6 +45,13 @@ public sealed class ServersController : ControllerBase
     {
         var id = await _serverService.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
+    }
+
+    [HttpPost("{id:guid}/install")]
+    public async Task<IActionResult> Install(Guid id, CancellationToken ct)
+    {
+        await _serverService.InstallAsync(id, ct);
+        return Accepted();
     }
 
     [HttpPost("{id:guid}/start")]

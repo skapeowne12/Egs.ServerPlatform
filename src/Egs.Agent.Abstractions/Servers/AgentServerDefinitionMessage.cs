@@ -1,6 +1,8 @@
-namespace Egs.Contracts.Servers;
+using Egs.Contracts.Servers;
 
-public sealed class ServerDetailsDto
+namespace Egs.Agent.Abstractions.Servers;
+
+public sealed class AgentServerDefinitionMessage
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;

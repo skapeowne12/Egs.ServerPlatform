@@ -1,7 +1,10 @@
-﻿using Egs.Agent.Abstractions.Commands;
+using System.Text.Json;
+using Egs.Agent.Abstractions.Commands;
 using Egs.Agent.Abstractions.Console;
+using Egs.Agent.Abstractions.Servers;
 using Egs.Agent.Abstractions.Status;
 using Egs.Application.Servers;
+using Egs.Contracts.Servers;
 using Egs.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +15,8 @@ namespace Egs.Api.Controllers;
 [Route("api/agent")]
 public sealed class AgentController : ControllerBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
     private readonly IServerStatusNotifier _statusNotifier;
     private readonly IServerConsoleNotifier _consoleNotifier;
@@ -57,6 +62,28 @@ public sealed class AgentController : ControllerBase
         return Ok(new AgentPollResponse(result));
     }
 
+    [HttpGet("servers/{serverId:guid}")]
+    public async Task<ActionResult<AgentServerDefinitionMessage>> GetServer(Guid serverId, CancellationToken ct)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
+
+        var server = await db.Servers.SingleOrDefaultAsync(x => x.Id == serverId, ct);
+        if (server is null)
+            return NotFound();
+
+        return Ok(new AgentServerDefinitionMessage
+        {
+            Id = server.Id,
+            Name = server.Name,
+            GameKey = server.GameKey,
+            NodeName = server.NodeName,
+            InstallPath = server.InstallPath,
+            Status = server.Status,
+            ProcessId = server.ProcessId,
+            Settings = DeserializeSettings(server.SettingsJson)
+        });
+    }
+
     [HttpPost("status")]
     public async Task<IActionResult> UpdateStatus([FromBody] AgentServerUpdateMessage message, CancellationToken ct)
     {
@@ -70,17 +97,15 @@ public sealed class AgentController : ControllerBase
         server.ProcessId = message.ProcessId;
         server.UpdatedUtc = message.UpdatedUtc;
 
-        var command = (await db.ServerCommands
-            .Where(x => x.ServerId == message.ServerId && x.Status == "Claimed")
-            .ToListAsync(ct))
-            .OrderByDescending(x => x.ClaimedUtc)
-            .FirstOrDefault();
-
-        if (command is not null)
+        if (message.CommandId is Guid commandId)
         {
-            command.Status = string.IsNullOrWhiteSpace(message.Error) ? "Completed" : "Failed";
-            command.Error = message.Error;
-            command.CompletedUtc = DateTime.UtcNow;
+            var command = await db.ServerCommands.SingleOrDefaultAsync(x => x.Id == commandId, ct);
+            if (command is not null)
+            {
+                command.Status = string.IsNullOrWhiteSpace(message.Error) ? "Completed" : "Failed";
+                command.Error = message.Error;
+                command.CompletedUtc = DateTime.UtcNow;
+            }
         }
 
         await db.SaveChangesAsync(ct);
@@ -102,5 +127,14 @@ public sealed class AgentController : ControllerBase
     {
         await _consoleNotifier.PublishAsync(message, ct);
         return Accepted();
+    }
+
+    private static ServerSettingsDto DeserializeSettings(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new ServerSettingsDto();
+
+        return JsonSerializer.Deserialize<ServerSettingsDto>(json, JsonOptions)
+               ?? new ServerSettingsDto();
     }
 }

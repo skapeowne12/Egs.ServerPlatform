@@ -38,6 +38,10 @@ else
                         @_details.Status
                     </MudChip>
 
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="InstallAsync">
+                        Install
+                    </MudButton>
+
                     <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="StartAsync">
                         Start
                     </MudButton>
@@ -171,6 +175,24 @@ else
         {
             await Api.SaveServerSettingsAsync(_details.Id, _details.Settings);
             _message = "Settings saved.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task InstallAsync()
+    {
+        if (_loadedServerId is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.InstallAsync(_loadedServerId.Value);
         }
         catch (Exception ex)
         {

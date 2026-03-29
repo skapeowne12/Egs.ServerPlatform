@@ -9,4 +9,5 @@ public sealed class ServerSettingsDto
 
     public DiscordBotSettingsDto DiscordBot { get; set; } = new();
     public CpuSettingsDto Cpu { get; set; } = new();
+    public ValheimServerSettingsDto Valheim { get; set; } = new();
 }

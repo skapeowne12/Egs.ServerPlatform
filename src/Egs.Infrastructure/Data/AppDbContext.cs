@@ -1,4 +1,4 @@
-﻿using Egs.Domain.Servers;
+using Egs.Domain.Servers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egs.Infrastructure.Data;
@@ -29,6 +29,10 @@ public sealed class AppDbContext : DbContext
 
             builder.Property(x => x.NodeName)
                 .HasMaxLength(100)
+                .IsRequired();
+
+            builder.Property(x => x.InstallPath)
+                .HasMaxLength(500)
                 .IsRequired();
 
             builder.Property(x => x.Status)

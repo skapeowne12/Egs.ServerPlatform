@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Egs.Agent.Abstractions.Status;
 using Egs.Application.Servers;
 using Egs.Contracts.Servers;
@@ -11,6 +12,7 @@ namespace Egs.Infrastructure.Servers;
 public sealed class SqliteServerService : IServerService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly Regex InvalidPathCharsRegex = new($"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()))}]", RegexOptions.Compiled);
 
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
     private readonly IServerStatusNotifier _statusNotifier;
@@ -69,6 +71,7 @@ public sealed class SqliteServerService : IServerService
             Name = server.Name,
             GameKey = server.GameKey,
             NodeName = server.NodeName,
+            InstallPath = server.InstallPath,
             Status = server.Status,
             ProcessId = server.ProcessId,
             Settings = DeserializeSettings(server.SettingsJson)
@@ -85,14 +88,21 @@ public sealed class SqliteServerService : IServerService
 
         await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
 
+        var serverId = Guid.NewGuid();
+        var normalizedName = request.Name.Trim();
+        var normalizedGameKey = request.GameKey.Trim();
+
+        var defaultSettings = BuildDefaultSettings(normalizedName, normalizedGameKey);
+
         var server = new ServerInstance
         {
-            Id = Guid.NewGuid(),
-            Name = request.Name.Trim(),
-            GameKey = request.GameKey.Trim(),
+            Id = serverId,
+            Name = normalizedName,
+            GameKey = normalizedGameKey,
             NodeName = string.IsNullOrWhiteSpace(request.NodeName) ? "Local" : request.NodeName.Trim(),
+            InstallPath = NormalizeInstallPath(request.InstallPath, normalizedGameKey, normalizedName, serverId),
             Status = "Stopped",
-            SettingsJson = SerializeSettings(new ServerSettingsDto()),
+            SettingsJson = SerializeSettings(defaultSettings),
             CreatedUtc = DateTimeOffset.UtcNow,
             UpdatedUtc = DateTimeOffset.UtcNow
         };
@@ -116,6 +126,9 @@ public sealed class SqliteServerService : IServerService
 
         await db.SaveChangesAsync(ct);
     }
+
+    public Task InstallAsync(Guid id, CancellationToken ct = default)
+        => QueueCommandAsync(id, "Install", "Installing", ct);
 
     public Task StartAsync(Guid id, CancellationToken ct = default)
         => QueueCommandAsync(id, "Start", "Starting", ct);
@@ -164,6 +177,25 @@ public sealed class SqliteServerService : IServerService
             ct);
     }
 
+    private static ServerSettingsDto BuildDefaultSettings(string serverName, string gameKey)
+    {
+        var settings = new ServerSettingsDto();
+
+        if (gameKey.Equals("valheim", StringComparison.OrdinalIgnoreCase)
+            || gameKey.Equals("valheim-dedicated", StringComparison.OrdinalIgnoreCase)
+            || gameKey.Equals("steam-valheim", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.Valheim.ServerName = serverName;
+            settings.Valheim.WorldName = MakeSafeWorldName(serverName);
+            settings.Valheim.Password = "changeit";
+            settings.Valheim.Public = true;
+            settings.Valheim.Crossplay = true;
+            settings.Valheim.Port = 2456;
+        }
+
+        return settings;
+    }
+
     private static string SerializeSettings(ServerSettingsDto settings) =>
         JsonSerializer.Serialize(settings, JsonOptions);
 
@@ -174,5 +206,36 @@ public sealed class SqliteServerService : IServerService
 
         return JsonSerializer.Deserialize<ServerSettingsDto>(json, JsonOptions)
                ?? new ServerSettingsDto();
+    }
+
+    private static string NormalizeInstallPath(string? requestedPath, string gameKey, string serverName, Guid serverId)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedPath))
+            return requestedPath.Trim();
+
+        var safeGameKey = MakeSafeSegment(gameKey, "game");
+        var safeServerName = MakeSafeSegment(serverName, "server");
+        return Path.Combine(safeGameKey, $"{safeServerName}-{serverId:N}"[..20]);
+    }
+
+    private static string MakeSafeWorldName(string value)
+    {
+        var source = string.IsNullOrWhiteSpace(value) ? "Dedicated" : value.Trim();
+        var chars = source.Where(char.IsLetterOrDigit).Take(32).ToArray();
+        return chars.Length == 0 ? "Dedicated" : new string(chars);
+    }
+
+    private static string MakeSafeSegment(string value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        var cleaned = InvalidPathCharsRegex.Replace(value.Trim(), "-");
+        cleaned = cleaned.Replace(' ', '-');
+        while (cleaned.Contains("--", StringComparison.Ordinal))
+            cleaned = cleaned.Replace("--", "-", StringComparison.Ordinal);
+
+        cleaned = cleaned.Trim('-', '.', ' ');
+        return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned;
     }
 }

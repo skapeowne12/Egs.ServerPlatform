@@ -36,6 +36,12 @@ public sealed class ServerApiClient
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task InstallAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsync($"api/servers/{id}/install", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task StartAsync(Guid id, CancellationToken ct = default)
     {
         var response = await _httpClient.PostAsync($"api/servers/{id}/start", null, ct);

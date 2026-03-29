@@ -1,6 +1,7 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using Egs.Agent.Abstractions.Commands;
 using Egs.Agent.Abstractions.Console;
+using Egs.Agent.Abstractions.Servers;
 using Egs.Agent.Abstractions.Status;
 
 namespace Egs.Agent.Windows.Services;
@@ -25,6 +26,15 @@ public sealed class ControlPlaneClient
             ct);
 
         return response?.Commands ?? [];
+    }
+
+    public async Task<AgentServerDefinitionMessage> GetServerDefinitionAsync(Guid serverId, CancellationToken ct)
+    {
+        var response = await _httpClient.GetFromJsonAsync<AgentServerDefinitionMessage>(
+            $"api/agent/servers/{serverId:guid}",
+            ct);
+
+        return response ?? throw new InvalidOperationException($"Server '{serverId}' was not returned by the API.");
     }
 
     public async Task PostStatusAsync(AgentServerUpdateMessage message, CancellationToken ct)
