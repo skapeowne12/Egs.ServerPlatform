@@ -1,0 +1,14 @@
+diff a/src/Egs.Agent.Abstractions/Status/AgentServerUpdateMessage.cs b/src/Egs.Agent.Abstractions/Status/AgentServerUpdateMessage.cs	(rejected hunks)
+@@ -1,8 +1,9 @@
+-﻿namespace Egs.Agent.Abstractions.Status;
++namespace Egs.Agent.Abstractions.Status;
+ 
+ public sealed record AgentServerUpdateMessage(
++    Guid? CommandId,
+     Guid ServerId,
+     string Status,
+     int? ProcessId,
+     string? Error,
+-    DateTimeOffset UpdatedUtc);
+\ No newline at end of file
++    DateTimeOffset UpdatedUtc);

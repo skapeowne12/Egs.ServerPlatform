@@ -1,0 +1,77 @@
+diff a/src/Egs.Api/Egs.Api.http b/src/Egs.Api/Egs.Api.http	(rejected hunks)
+@@ -1,6 +1,69 @@
+-@Egs.Api_HostAddress = http://localhost:5277
+-
+-GET {{Egs.Api_HostAddress}}/weatherforecast/
+-Accept: application/json
+-
+-###
++@Egs.Api_HostAddress = https://localhost:7110
++@ServerId = 00000000-0000-0000-0000-000000000000
++
++### Create a Valheim server
++POST {{Egs.Api_HostAddress}}/api/servers
++Content-Type: application/json
++
++{
++  "name": "Valheim POC",
++  "gameKey": "valheim",
++  "nodeName": "Local",
++  "installPath": "valheim\\poc"
++}
++
++### Get server details
++GET {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/details
++Accept: application/json
++
++### Update Valheim settings
++PUT {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/settings
++Content-Type: application/json
++
++{
++  "startupArguments": "",
++  "autoStart": false,
++  "autoRestart": false,
++  "autoUpdate": false,
++  "discordBot": {
++    "enabled": false,
++    "botTokenReference": "",
++    "guildId": "",
++    "channelId": "",
++    "announceStartStop": false,
++    "announcePlayers": false
++  },
++  "cpu": {
++    "useAffinityMask": false,
++    "affinityMask": null,
++    "priorityClass": "Normal"
++  },
++  "valheim": {
++    "serverName": "Valheim POC",
++    "worldName": "ValheimPOC",
++    "password": "changeit",
++    "port": 2456,
++    "public": true,
++    "crossplay": true,
++    "saveDirectory": "",
++    "logFilePath": "",
++    "saveIntervalSeconds": null,
++    "backupCount": null,
++    "backupShortSeconds": null,
++    "backupLongSeconds": null,
++    "instanceId": "",
++    "preset": ""
++  }
++}
++
++### Queue install
++POST {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/install
++
++### Queue start
++POST {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/start
++
++### Queue stop
++POST {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/stop
++
++### Queue restart
++POST {{Egs.Api_HostAddress}}/api/servers/{{ServerId}}/restart

@@ -1,0 +1,20 @@
+diff a/src/Egs.Agent.Abstractions/Commands/ServerCommandType.cs b/src/Egs.Agent.Abstractions/Commands/ServerCommandType.cs	(rejected hunks)
+@@ -1,8 +1,9 @@
+-﻿namespace Egs.Agent.Abstractions.Commands;
+-
+-public enum ServerCommandType
+-{
+-    Start = 1,
+-    Stop = 2,
+-    Restart = 3
+-}
+\ No newline at end of file
++namespace Egs.Agent.Abstractions.Commands;
++
++public enum ServerCommandType
++{
++    Install = 1,
++    Start = 2,
++    Stop = 3,
++    Restart = 4
++}

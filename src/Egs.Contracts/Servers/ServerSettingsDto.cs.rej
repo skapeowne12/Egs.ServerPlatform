@@ -1,0 +1,27 @@
+diff a/src/Egs.Contracts/Servers/ServerSettingsDto.cs b/src/Egs.Contracts/Servers/ServerSettingsDto.cs	(rejected hunks)
+@@ -1,12 +1,13 @@
+-﻿namespace Egs.Contracts.Servers;
+-
+-public sealed class ServerSettingsDto
+-{
+-    public string StartupArguments { get; set; } = string.Empty;
+-    public bool AutoStart { get; set; }
+-    public bool AutoRestart { get; set; }
+-    public bool AutoUpdate { get; set; }
+-
+-    public DiscordBotSettingsDto DiscordBot { get; set; } = new();
+-    public CpuSettingsDto Cpu { get; set; } = new();
++﻿namespace Egs.Contracts.Servers;
++
++public sealed class ServerSettingsDto
++{
++    public string StartupArguments { get; set; } = string.Empty;
++    public bool AutoStart { get; set; }
++    public bool AutoRestart { get; set; }
++    public bool AutoUpdate { get; set; }
++
++    public DiscordBotSettingsDto DiscordBot { get; set; } = new();
++    public CpuSettingsDto Cpu { get; set; } = new();
++    public ValheimServerSettingsDto Valheim { get; set; } = new();
+ }
+\ No newline at end of file

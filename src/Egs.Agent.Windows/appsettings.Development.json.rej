@@ -1,0 +1,28 @@
+diff a/src/Egs.Agent.Windows/appsettings.Development.json b/src/Egs.Agent.Windows/appsettings.Development.json	(rejected hunks)
+@@ -1,12 +1,14 @@
+-{
+-  "Logging": {
+-    "LogLevel": {
+-      "Default": "Information",
+-      "Microsoft.Hosting.Lifetime": "Information"
+-    },
+-    "Agent": {
+-      "ApiBaseUrl": "https://localhost:7110/",
+-      "NodeName": "Local"
+-    }
+-  }
+-}
++{
++  "Logging": {
++    "LogLevel": {
++      "Default": "Information",
++      "Microsoft.Hosting.Lifetime": "Information"
++    }
++  },
++  "Agent": {
++    "ApiBaseUrl": "https://localhost:7110/",
++    "NodeName": "Local",
++    "ServerRootPath": "C:\\Egs\\Servers",
++    "SteamCmdRootPath": "C:\\Egs\\SteamCMD"
++  }
++}

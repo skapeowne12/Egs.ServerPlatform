@@ -1,0 +1,34 @@
+diff a/src/Egs.Application/Servers/IServerService.cs b/src/Egs.Application/Servers/IServerService.cs	(rejected hunks)
+@@ -1,15 +1,16 @@
+-﻿using Egs.Contracts.Servers;
+-
+-namespace Egs.Application.Servers;
+-
+-public interface IServerService
+-{
+-    Task<IReadOnlyList<ServerSummaryDto>> GetAllAsync(CancellationToken ct = default);
+-    Task<ServerSummaryDto?> GetAsync(Guid id, CancellationToken ct = default);
+-    Task<ServerDetailsDto?> GetDetailsAsync(Guid id, CancellationToken ct = default);
+-    Task<Guid> CreateAsync(CreateServerRequest request, CancellationToken ct = default);
+-    Task UpdateSettingsAsync(Guid id, ServerSettingsDto settings, CancellationToken ct = default);
+-    Task StartAsync(Guid id, CancellationToken ct = default);
+-    Task StopAsync(Guid id, CancellationToken ct = default);
+-    Task RestartAsync(Guid id, CancellationToken ct = default);
+-}
+\ No newline at end of file
++using Egs.Contracts.Servers;
++
++namespace Egs.Application.Servers;
++
++public interface IServerService
++{
++    Task<IReadOnlyList<ServerSummaryDto>> GetAllAsync(CancellationToken ct = default);
++    Task<ServerSummaryDto?> GetAsync(Guid id, CancellationToken ct = default);
++    Task<ServerDetailsDto?> GetDetailsAsync(Guid id, CancellationToken ct = default);
++    Task<Guid> CreateAsync(CreateServerRequest request, CancellationToken ct = default);
++    Task UpdateSettingsAsync(Guid id, ServerSettingsDto settings, CancellationToken ct = default);
++    Task InstallAsync(Guid id, CancellationToken ct = default);
++    Task StartAsync(Guid id, CancellationToken ct = default);
++    Task StopAsync(Guid id, CancellationToken ct = default);
++    Task RestartAsync(Guid id, CancellationToken ct = default);
++}

@@ -1,0 +1,153 @@
+diff a/src/Egs.Infrastructure/Data/AppDbContext.cs b/src/Egs.Infrastructure/Data/AppDbContext.cs	(rejected hunks)
+@@ -1,73 +1,77 @@
+-﻿using Egs.Domain.Servers;
+-using Microsoft.EntityFrameworkCore;
+-
+-namespace Egs.Infrastructure.Data;
+-
+-public sealed class AppDbContext : DbContext
+-{
+-    public AppDbContext(DbContextOptions<AppDbContext> options)
+-        : base(options)
+-    {
+-    }
+-
+-    public DbSet<ServerCommand> ServerCommands => Set<ServerCommand>();
+-    public DbSet<ServerInstance> Servers => Set<ServerInstance>();
+-
+-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+-    {
+-        modelBuilder.Entity<ServerInstance>(builder =>
+-        {
+-            builder.HasKey(x => x.Id);
+-
+-            builder.Property(x => x.Name)
+-                .HasMaxLength(200)
+-                .IsRequired();
+-
+-            builder.Property(x => x.GameKey)
+-                .HasMaxLength(100)
+-                .IsRequired();
+-
+-            builder.Property(x => x.NodeName)
+-                .HasMaxLength(100)
+-                .IsRequired();
+-
+-            builder.Property(x => x.Status)
+-                .HasMaxLength(50)
+-                .IsRequired();
+-
+-            builder.Property(x => x.SettingsJson)
+-                .HasColumnType("TEXT")
+-                .IsRequired();
+-        });
+-
+-        modelBuilder.Entity<ServerCommand>(builder =>
+-        {
+-            builder.HasKey(x => x.Id);
+-
+-            builder.Property(x => x.Type)
+-                .HasMaxLength(50)
+-                .IsRequired();
+-
+-            builder.Property(x => x.Status)
+-                .HasMaxLength(50)
+-                .IsRequired();
+-
+-            builder.Property(x => x.NodeName)
+-                .HasMaxLength(100)
+-                .IsRequired();
+-
+-            builder.Property(x => x.Error)
+-                .HasMaxLength(4000);
+-
+-            builder.Property(x => x.CreatedUtc)
+-                .IsRequired();
+-
+-            builder.HasIndex(x => new { x.NodeName, x.Status, x.CreatedUtc });
+-
+-            builder.HasOne<ServerInstance>()
+-                .WithMany()
+-                .HasForeignKey(x => x.ServerId)
+-                .OnDelete(DeleteBehavior.Cascade);
+-        });
+-    }
+-}
+\ No newline at end of file
++using Egs.Domain.Servers;
++using Microsoft.EntityFrameworkCore;
++
++namespace Egs.Infrastructure.Data;
++
++public sealed class AppDbContext : DbContext
++{
++    public AppDbContext(DbContextOptions<AppDbContext> options)
++        : base(options)
++    {
++    }
++
++    public DbSet<ServerCommand> ServerCommands => Set<ServerCommand>();
++    public DbSet<ServerInstance> Servers => Set<ServerInstance>();
++
++    protected override void OnModelCreating(ModelBuilder modelBuilder)
++    {
++        modelBuilder.Entity<ServerInstance>(builder =>
++        {
++            builder.HasKey(x => x.Id);
++
++            builder.Property(x => x.Name)
++                .HasMaxLength(200)
++                .IsRequired();
++
++            builder.Property(x => x.GameKey)
++                .HasMaxLength(100)
++                .IsRequired();
++
++            builder.Property(x => x.NodeName)
++                .HasMaxLength(100)
++                .IsRequired();
++
++            builder.Property(x => x.InstallPath)
++                .HasMaxLength(500)
++                .IsRequired();
++
++            builder.Property(x => x.Status)
++                .HasMaxLength(50)
++                .IsRequired();
++
++            builder.Property(x => x.SettingsJson)
++                .HasColumnType("TEXT")
++                .IsRequired();
++        });
++
++        modelBuilder.Entity<ServerCommand>(builder =>
++        {
++            builder.HasKey(x => x.Id);
++
++            builder.Property(x => x.Type)
++                .HasMaxLength(50)
++                .IsRequired();
++
++            builder.Property(x => x.Status)
++                .HasMaxLength(50)
++                .IsRequired();
++
++            builder.Property(x => x.NodeName)
++                .HasMaxLength(100)
++                .IsRequired();
++
++            builder.Property(x => x.Error)
++                .HasMaxLength(4000);
++
++            builder.Property(x => x.CreatedUtc)
++                .IsRequired();
++
++            builder.HasIndex(x => new { x.NodeName, x.Status, x.CreatedUtc });
++
++            builder.HasOne<ServerInstance>()
++                .WithMany()
++                .HasForeignKey(x => x.ServerId)
++                .OnDelete(DeleteBehavior.Cascade);
++        });
++    }
++}
