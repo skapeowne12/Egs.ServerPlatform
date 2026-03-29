@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Egs.Agent.Abstractions\Egs.Agent.Abstractions.csproj" />
+    <ProjectReference Include="..\Egs.Contracts\Egs.Contracts.csproj" />
+    <ProjectReference Include="..\Egs.Domain\Egs.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

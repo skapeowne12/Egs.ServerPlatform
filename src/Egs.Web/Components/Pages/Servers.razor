@@ -1,0 +1,340 @@
+﻿@page "/"
+@page "/servers"
+@using Egs.Agent.Abstractions.Console
+@using Egs.Agent.Abstractions.Status
+@using Egs.Contracts.Servers
+@using Egs.Web.Components.Servers
+@using Egs.Web.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject ServerApiClient Api
+@inject IConfiguration Configuration
+@implements IAsyncDisposable
+
+<PageTitle>Servers</PageTitle>
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-4" Style="height: calc(100vh - 120px); overflow-y: auto;">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h6">Servers</MudText>
+
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="LoadAsync">
+                    Refresh
+                </MudButton>
+            </MudStack>
+
+            <MudPaper Class="pa-3 mb-4" Outlined="true">
+                <MudText Typo="Typo.subtitle2" Class="mb-3">Create Server</MudText>
+
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_newName"
+                                  Label="Server Name"
+                                  Variant="Variant.Outlined" />
+
+                    <MudTextField @bind-Value="_newGameKey"
+                                  Label="Game Key"
+                                  Variant="Variant.Outlined" />
+
+                    <MudTextField @bind-Value="_newNodeName"
+                                  Label="Node Name"
+                                  Variant="Variant.Outlined" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateServerAsync">
+                        Create
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+
+            @if (!string.IsNullOrWhiteSpace(_message))
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">@_message</MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_error</MudAlert>
+            }
+
+            @if (_loading)
+            {
+                <MudProgressCircular Indeterminate="true" />
+            }
+            else if (_servers.Count == 0)
+            {
+                <MudText Typo="Typo.body2">No servers found.</MudText>
+            }
+            else
+            {
+                @foreach (var server in _servers)
+                {
+                    var isSelected = _selectedServerId == server.Id;
+
+                    <MudPaper Class="pa-3 mb-2"
+                              Outlined="true"
+                              Style="@GetServerCardStyle(isSelected)"
+                              @onclick="@(() => SelectServer(server.Id))">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@server.Name</MudText>
+                                <MudText Typo="Typo.caption">@server.GameKey | @server.NodeName</MudText>
+                                @if (server.ProcessId is not null)
+                                {
+                                    <MudText Typo="Typo.caption">PID: @server.ProcessId</MudText>
+                                }
+                            </div>
+
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="@GetStatusColor(server.Status)"
+                                     Variant="Variant.Outlined">
+                                @server.Status
+                            </MudChip>
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="9">
+        <ServerDashboardPanel ServerId="_selectedServerId"
+                              ConsoleLines="SelectedConsoleLines" />
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly List<ServerSummaryDto> _servers = [];
+    private readonly Dictionary<Guid, List<string>> _consoleLinesByServer = [];
+    private readonly HashSet<Guid> _subscribedServerIds = [];
+
+    private HubConnection? _statusHub;
+    private HubConnection? _consoleHub;
+
+    private Guid? _selectedServerId;
+    private bool _loading;
+    private string? _error;
+    private string? _message;
+
+    private string _newName = string.Empty;
+    private string _newGameKey = "valheim";
+    private string _newNodeName = "Local";
+
+    private IReadOnlyList<string> SelectedConsoleLines =>
+        _selectedServerId is not null && _consoleLinesByServer.TryGetValue(_selectedServerId.Value, out var lines)
+            ? lines
+            : Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await ConnectStatusHubAsync();
+        await ConnectConsoleHubAsync();
+        await SyncConsoleSubscriptionsAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var servers = (await Api.GetServersAsync()).ToList();
+
+            _servers.Clear();
+            _servers.AddRange(servers);
+
+            foreach (var server in _servers)
+            {
+                if (!_consoleLinesByServer.ContainsKey(server.Id))
+                    _consoleLinesByServer[server.Id] = [];
+            }
+
+            if (_servers.Count > 0 && (_selectedServerId is null || !_servers.Any(x => x.Id == _selectedServerId)))
+            {
+                _selectedServerId = _servers[0].Id;
+            }
+            else if (_servers.Count == 0)
+            {
+                _selectedServerId = null;
+            }
+
+            await SyncConsoleSubscriptionsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ConnectStatusHubAsync()
+    {
+        if (_statusHub is not null)
+            return;
+
+        var apiBase = Configuration["ApiBaseUrl"] ?? "https://localhost:7110/";
+        var hubUrl = new Uri(new Uri(apiBase), "hubs/server-status");
+
+        _statusHub = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        _statusHub.On<ServerStatusChangedMessage>("ServerStatusChanged", async message =>
+        {
+            var existing = _servers.FirstOrDefault(x => x.Id == message.ServerId);
+            if (existing is null)
+                return;
+
+            var index = _servers.IndexOf(existing);
+
+            _servers[index] = existing with
+            {
+                Status = message.Status,
+                ProcessId = message.ProcessId
+            };
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _statusHub.StartAsync();
+    }
+
+    private async Task ConnectConsoleHubAsync()
+    {
+        if (_consoleHub is not null)
+            return;
+
+        var apiBase = Configuration["ApiBaseUrl"] ?? "https://localhost:7110/";
+        var hubUrl = new Uri(new Uri(apiBase), "hubs/server-console");
+
+        _consoleHub = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        _consoleHub.On<ConsoleLineMessage>("ConsoleLine", async message =>
+        {
+            if (!_consoleLinesByServer.TryGetValue(message.ServerId, out var lines))
+            {
+                lines = [];
+                _consoleLinesByServer[message.ServerId] = lines;
+            }
+
+            lines.Add($"{message.TimestampUtc:HH:mm:ss}  {message.Line}");
+
+            if (lines.Count > 500)
+                lines.RemoveAt(0);
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _consoleHub.StartAsync();
+    }
+
+    private async Task SyncConsoleSubscriptionsAsync()
+    {
+        if (_consoleHub is null || _consoleHub.State != HubConnectionState.Connected)
+            return;
+
+        var currentIds = _servers.Select(x => x.Id).ToHashSet();
+
+        var idsToRemove = _subscribedServerIds.Except(currentIds).ToList();
+        foreach (var id in idsToRemove)
+        {
+            try
+            {
+                await _consoleHub.InvokeAsync("UnsubscribeServer", id);
+            }
+            catch
+            {
+            }
+
+            _subscribedServerIds.Remove(id);
+        }
+
+        var idsToAdd = currentIds.Except(_subscribedServerIds).ToList();
+        foreach (var id in idsToAdd)
+        {
+            await _consoleHub.InvokeAsync("SubscribeServer", id);
+            _subscribedServerIds.Add(id);
+        }
+    }
+
+    private void SelectServer(Guid id)
+    {
+        _selectedServerId = id;
+        _message = null;
+        _error = null;
+    }
+
+    private async Task CreateServerAsync()
+    {
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.CreateServerAsync(new CreateServerRequest
+            {
+                Name = _newName,
+                GameKey = _newGameKey,
+                NodeName = _newNodeName
+            });
+
+            _newName = string.Empty;
+            _message = "Server created.";
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Running" => Color.Success,
+        "Starting" => Color.Info,
+        "Restarting" => Color.Warning,
+        "Stopping" => Color.Warning,
+        "Stopped" => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string GetServerCardStyle(bool selected) =>
+        selected
+            ? "cursor:pointer; border: 2px solid var(--mud-palette-primary); background-color: rgba(99, 102, 241, 0.08);"
+            : "cursor:pointer;";
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_consoleHub is not null)
+        {
+            foreach (var id in _subscribedServerIds.ToList())
+            {
+                try
+                {
+                    if (_consoleHub.State == HubConnectionState.Connected)
+                        await _consoleHub.InvokeAsync("UnsubscribeServer", id);
+                }
+                catch
+                {
+                }
+            }
+
+            await _consoleHub.DisposeAsync();
+        }
+
+        if (_statusHub is not null)
+        {
+            await _statusHub.DisposeAsync();
+        }
+    }
+}

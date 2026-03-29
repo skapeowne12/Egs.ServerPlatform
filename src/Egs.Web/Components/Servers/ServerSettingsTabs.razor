@@ -1,0 +1,110 @@
+﻿@using Egs.Contracts.Servers
+
+@if (Details is not null)
+{
+    <MudTabs Rounded="true" PanelClass="pa-4">
+        <MudTabPanel Text="General">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="Details.Settings.StartupArguments"
+                                  Label="Startup Arguments"
+                                  Variant="Variant.Outlined"
+                                  Lines="3" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSwitch @bind-Value="Details.Settings.AutoStart"
+                               Color="Color.Primary"
+                               Label="Auto Start" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSwitch @bind-Value="Details.Settings.AutoRestart"
+                               Color="Color.Primary"
+                               Label="Auto Restart" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSwitch @bind-Value="Details.Settings.AutoUpdate"
+                               Color="Color.Primary"
+                               Label="Auto Update" />
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Discord">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudSwitch @bind-Value="Details.Settings.DiscordBot.Enabled"
+                               Color="Color.Primary"
+                               Label="Enable Discord Bot Integration" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="Details.Settings.DiscordBot.BotTokenReference"
+                                  Label="Bot Token Reference"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="Details.Settings.DiscordBot.GuildId"
+                                  Label="Guild ID"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="Details.Settings.DiscordBot.ChannelId"
+                                  Label="Channel ID"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSwitch @bind-Value="Details.Settings.DiscordBot.AnnounceStartStop"
+                               Color="Color.Primary"
+                               Label="Announce Start/Stop" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSwitch @bind-Value="Details.Settings.DiscordBot.AnnouncePlayers"
+                               Color="Color.Primary"
+                               Label="Announce Player Events" />
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Process">
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="6">
+                    <MudSwitch @bind-Value="Details.Settings.Cpu.UseAffinityMask"
+                               Color="Color.Primary"
+                               Label="Use CPU Affinity Mask" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField T="long?"
+                                  @bind-Value="Details.Settings.Cpu.AffinityMask"
+                                  Label="Affinity Mask"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect T="string"
+                               @bind-Value="Details.Settings.Cpu.PriorityClass"
+                               Label="Priority Class"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="string" Value='@("Idle")'>Idle</MudSelectItem>
+                        <MudSelectItem T="string" Value='@("BelowNormal")'>BelowNormal</MudSelectItem>
+                        <MudSelectItem T="string" Value='@("Normal")'>Normal</MudSelectItem>
+                        <MudSelectItem T="string" Value='@("AboveNormal")'>AboveNormal</MudSelectItem>
+                        <MudSelectItem T="string" Value='@("High")'>High</MudSelectItem>
+                        <MudSelectItem T="string" Value='@("RealTime")'>RealTime</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public ServerDetailsDto? Details { get; set; }
+}

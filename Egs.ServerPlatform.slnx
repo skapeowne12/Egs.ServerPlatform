@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="src/Egs.Agent.Abstractions/Egs.Agent.Abstractions.csproj" Id="07a5807d-1ccb-462f-8f41-95800c3e1b5f" />
+  <Project Path="src/Egs.Agent.Windows/Egs.Agent.Windows.csproj" />
+  <Project Path="src/Egs.Api/Egs.Api.csproj" />
+  <Project Path="src/Egs.Application/Egs.Application.csproj" />
+  <Project Path="src/Egs.Contracts/Egs.Contracts.csproj" />
+  <Project Path="src/Egs.Domain/Egs.Domain.csproj" />
+  <Project Path="src/Egs.Infrastructure/Egs.Infrastructure.csproj" />
+  <Project Path="src/Egs.PluginSdk/Egs.PluginSdk.csproj" />
+  <Project Path="src/Egs.Web/Egs.Web.csproj" />
+</Solution>

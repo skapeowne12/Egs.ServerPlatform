@@ -1,0 +1,252 @@
+﻿@using Egs.Agent.Abstractions.Status
+@using Egs.Contracts.Servers
+@using Egs.Web.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject ServerApiClient Api
+@inject IConfiguration Configuration
+@implements IAsyncDisposable
+
+@if (ServerId is null)
+{
+    <MudPaper Class="pa-6">
+        <MudText Typo="Typo.h6">Select a server</MudText>
+        <MudText Typo="Typo.body2">Choose a server from the list to load its dashboard.</MudText>
+    </MudPaper>
+}
+else if (_details is null)
+{
+    <MudPaper Class="pa-6">
+        <MudProgressCircular Indeterminate="true" />
+    </MudPaper>
+}
+else
+{
+    <MudStack Spacing="3">
+        <MudPaper Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <div>
+                    <MudText Typo="Typo.h4">@_details.Name</MudText>
+                    <MudText Typo="Typo.body2">
+                        Game: @_details.GameKey | Node: @_details.NodeName
+                    </MudText>
+                </div>
+
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                    <MudChip T="string"
+                             Color="@GetStatusColor(_details.Status)"
+                             Variant="Variant.Filled">
+                        @_details.Status
+                    </MudChip>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="StartAsync">
+                        Start
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="RestartAsync">
+                        Restart
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopAsync">
+                        Stop
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">
+                        Save Settings
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(_message))
+        {
+            <MudAlert Severity="Severity.Success">@_message</MudAlert>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="7">
+                <ServerSettingsTabs Details="_details" />
+            </MudItem>
+
+            <MudItem xs="12" md="5">
+                <MudPaper Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Quick Status</MudText>
+
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">Status: @_details.Status</MudText>
+                        <MudText Typo="Typo.body2">Node: @_details.NodeName</MudText>
+                        <MudText Typo="Typo.body2">PID: @(_details.ProcessId?.ToString() ?? "-")</MudText>
+                    </MudStack>
+                </MudPaper>
+
+                <ServerConsolePanel Lines="ConsoleLines" />
+            </MudItem>
+        </MudGrid>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public Guid? ServerId { get; set; }
+    [Parameter] public IReadOnlyList<string> ConsoleLines { get; set; } = Array.Empty<string>();
+
+    private ServerDetailsDto? _details;
+    private Guid? _loadedServerId;
+    private HubConnection? _statusHub;
+
+    private string? _error;
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await EnsureStatusHubConnectedAsync();
+
+        if (ServerId is null)
+        {
+            _details = null;
+            _loadedServerId = null;
+            return;
+        }
+
+        if (_loadedServerId != ServerId)
+        {
+            _loadedServerId = ServerId;
+            _error = null;
+            _message = null;
+
+            await LoadDetailsAsync();
+        }
+    }
+
+    private async Task EnsureStatusHubConnectedAsync()
+    {
+        if (_statusHub is not null)
+            return;
+
+        var apiBase = Configuration["ApiBaseUrl"] ?? "https://localhost:7110/";
+        var statusHubUrl = new Uri(new Uri(apiBase), "hubs/server-status");
+
+        _statusHub = new HubConnectionBuilder()
+            .WithUrl(statusHubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        _statusHub.On<ServerStatusChangedMessage>("ServerStatusChanged", async message =>
+        {
+            if (_details is null || _loadedServerId is null || message.ServerId != _loadedServerId.Value)
+                return;
+
+            _details.Status = message.Status;
+            _details.ProcessId = message.ProcessId;
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _statusHub.StartAsync();
+    }
+
+    private async Task LoadDetailsAsync()
+    {
+        if (_loadedServerId is null)
+        {
+            _details = null;
+            return;
+        }
+
+        _details = await Api.GetServerDetailsAsync(_loadedServerId.Value);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_details is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.SaveServerSettingsAsync(_details.Id, _details.Settings);
+            _message = "Settings saved.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        if (_loadedServerId is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.StartAsync(_loadedServerId.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        if (_loadedServerId is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.StopAsync(_loadedServerId.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RestartAsync()
+    {
+        if (_loadedServerId is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.RestartAsync(_loadedServerId.Value);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Running" => Color.Success,
+        "Starting" => Color.Info,
+        "Restarting" => Color.Warning,
+        "Stopping" => Color.Warning,
+        "Stopped" => Color.Default,
+        _ => Color.Default
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_statusHub is not null)
+        {
+            await _statusHub.DisposeAsync();
+        }
+    }
+}
