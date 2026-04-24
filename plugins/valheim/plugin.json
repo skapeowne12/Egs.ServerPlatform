@@ -1,0 +1,98 @@
+{
+  "key": "valheim",
+  "displayName": "Valheim Dedicated Server",
+  "description": "SteamCMD-based Valheim dedicated server plugin with manifest-driven install, setup, and runtime behavior.",
+  "defaultInstallPathTemplate": "{server.gameKeySafe}/{server.nameSafe}-{server.idShort}",
+  "installer": {
+    "type": "steamcmd",
+    "steamAppId": "896660",
+    "loginMode": "anonymous-first",
+    "validateOnInstall": true
+  },
+  "runtime": {
+    "executablePath": "{server.installDirectory}/valheim_server.exe",
+    "workingDirectory": "{server.installDirectory}",
+    "argumentsTemplate": "-nographics -batchmode -name {settings.serverName:quote} -port {settings.port} -world {settings.worldName:quote} -password {settings.password:quote} -public {settings.public:boolint} {settings.crossplay:flag:-crossplay} {settings.additionalArgs}",
+    "readiness": {
+      "stdoutContains": [
+        "Game server connected"
+      ],
+      "timeoutSeconds": 120
+    },
+    "stop": {
+      "mode": "kill-process-tree",
+      "gracePeriodSeconds": 30
+    }
+  },
+  "requirements": [
+    {
+      "type": "port",
+      "protocol": "udp",
+      "ports": [
+        2456,
+        2457
+      ],
+      "message": "Valheim typically uses UDP 2456 and 2457. Assign unique ports per instance and open them in the firewall/router as needed."
+    }
+  ],
+  "setup": [
+    {
+      "stage": "beforeInstall",
+      "type": "ensureDirectory",
+      "path": "{server.installDirectory}/steamapps"
+    },
+    {
+      "stage": "afterInstall",
+      "type": "writeTemplateFile",
+      "templateFile": "templates/start.bat.tpl",
+      "destinationPath": "{server.installDirectory}/start.bat",
+      "overwrite": true
+    }
+  ],
+  "defaultSettings": {
+    "serverName": "EGS Valheim",
+    "worldName": "EGSValheim",
+    "password": "changeit",
+    "port": 2456,
+    "public": true,
+    "crossplay": true,
+    "additionalArgs": ""
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "serverName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "worldName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "password": {
+        "type": "string",
+        "minLength": 5
+      },
+      "port": {
+        "type": "integer",
+        "minimum": 1024,
+        "maximum": 65535
+      },
+      "public": {
+        "type": "boolean"
+      },
+      "crossplay": {
+        "type": "boolean"
+      },
+      "additionalArgs": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "serverName",
+      "worldName",
+      "password",
+      "port"
+    ]
+  }
+}

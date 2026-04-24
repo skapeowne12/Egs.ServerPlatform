@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Egs.Application\Egs.Application.csproj" />
     <ProjectReference Include="..\Egs.Contracts\Egs.Contracts.csproj" />
     <ProjectReference Include="..\Egs.Domain\Egs.Domain.csproj" />
+    <ProjectReference Include="..\Egs.PluginSdk\Egs.PluginSdk.csproj" />
   </ItemGroup>
 
 </Project>

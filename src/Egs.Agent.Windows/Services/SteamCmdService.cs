@@ -71,6 +71,7 @@ public sealed class SteamCmdService
         string appId,
         string installDirectory,
         bool validate,
+        bool anonymousFirst,
         Func<string, Task> writeLineAsync,
         CancellationToken ct)
     {
@@ -80,7 +81,78 @@ public sealed class SteamCmdService
 
         var steamCmdExe = GetSteamCmdExecutablePath();
         var steamCmdWorkingDirectory = Path.GetDirectoryName(steamCmdExe)!;
-        var installCommand = $"+force_install_dir {Quote(installDirectory)} {BuildLoginCommand(anonymous: true)} +app_update {appId}";
+
+        await writeLineAsync("[SteamCMD] Priming SteamCMD...");
+        await RunProcessAsync(steamCmdExe, "+quit", steamCmdWorkingDirectory, writeLineAsync, ct);
+
+        var exitCode = await RunInstallAsync(
+            steamCmdExe,
+            appId,
+            installDirectory,
+            validate,
+            anonymous: anonymousFirst,
+            writeLineAsync,
+            ct);
+
+        if (exitCode == 0)
+        {
+            return;
+        }
+
+        if (anonymousFirst)
+        {
+            await writeLineAsync("[SteamCMD] Anonymous install failed once; retrying anonymous after bootstrap...");
+            exitCode = await RunInstallAsync(
+                steamCmdExe,
+                appId,
+                installDirectory,
+                validate,
+                anonymous: true,
+                writeLineAsync,
+                ct);
+
+            if (exitCode == 0)
+            {
+                return;
+            }
+        }
+
+        var steamUser = _configuration["Agent:SteamUser"];
+        var steamPassword = _configuration["Agent:SteamPassword"];
+        if (string.IsNullOrWhiteSpace(steamUser) || string.IsNullOrWhiteSpace(steamPassword))
+        {
+            throw new InvalidOperationException(
+                $"SteamCMD exited with code {exitCode} while installing app {appId}. Anonymous login was attempted first. Configure Agent:SteamUser and Agent:SteamPassword if this plugin requires authenticated SteamCMD access.");
+        }
+
+        await writeLineAsync("[SteamCMD] Retrying install with configured Steam credentials...");
+
+        exitCode = await RunInstallAsync(
+            steamCmdExe,
+            appId,
+            installDirectory,
+            validate,
+            anonymous: false,
+            writeLineAsync,
+            ct);
+
+        if (exitCode != 0)
+        {
+            throw new InvalidOperationException($"SteamCMD exited with code {exitCode} while installing app {appId}, even after retrying with configured credentials.");
+        }
+    }
+
+    private async Task<int> RunInstallAsync(
+        string steamCmdExe,
+        string appId,
+        string installDirectory,
+        bool validate,
+        bool anonymous,
+        Func<string, Task> writeLineAsync,
+        CancellationToken ct)
+    {
+        var steamCmdWorkingDirectory = Path.GetDirectoryName(steamCmdExe)!;
+        var installCommand = $"+force_install_dir {Quote(installDirectory)} {BuildLoginCommand(anonymous)} +app_update {appId}";
         if (validate)
         {
             installCommand += " validate";
@@ -89,35 +161,7 @@ public sealed class SteamCmdService
         installCommand += " +quit";
 
         await writeLineAsync($"[SteamCMD] Installing app {appId} into '{installDirectory}'...");
-        var exitCode = await RunProcessAsync(steamCmdExe, installCommand, steamCmdWorkingDirectory, writeLineAsync, ct);
-        if (exitCode == 0)
-        {
-            return;
-        }
-
-        var steamUser = _configuration["Agent:SteamUser"];
-        var steamPassword = _configuration["Agent:SteamPassword"];
-        if (string.IsNullOrWhiteSpace(steamUser) || string.IsNullOrWhiteSpace(steamPassword))
-        {
-            throw new InvalidOperationException(
-                $"SteamCMD exited with code {exitCode} while installing app {appId}. Configure Agent:SteamUser and Agent:SteamPassword if this server requires authenticated SteamCMD access.");
-        }
-
-        await writeLineAsync("[SteamCMD] Anonymous install failed; retrying with configured Steam credentials...");
-
-        var credentialedCommand = $"+force_install_dir {Quote(installDirectory)} {BuildLoginCommand(anonymous: false)} +app_update {appId}";
-        if (validate)
-        {
-            credentialedCommand += " validate";
-        }
-
-        credentialedCommand += " +quit";
-
-        exitCode = await RunProcessAsync(steamCmdExe, credentialedCommand, steamCmdWorkingDirectory, writeLineAsync, ct);
-        if (exitCode != 0)
-        {
-            throw new InvalidOperationException($"SteamCMD exited with code {exitCode} while installing app {appId}, even after retrying with configured credentials.");
-        }
+        return await RunProcessAsync(steamCmdExe, installCommand, steamCmdWorkingDirectory, writeLineAsync, ct);
     }
 
     private async Task<int> RunProcessAsync(

@@ -1,13 +1,14 @@
-using System.Text.Json;
 using Egs.Agent.Abstractions.Commands;
 using Egs.Agent.Abstractions.Console;
 using Egs.Agent.Abstractions.Servers;
 using Egs.Agent.Abstractions.Status;
 using Egs.Application.Servers;
 using Egs.Contracts.Servers;
+using Egs.Domain.Servers;
 using Egs.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Egs.Api.Controllers;
 
@@ -93,13 +94,10 @@ public sealed class AgentController : ControllerBase
         if (server is null)
             return NotFound();
 
-        server.Status = message.Status;
-        server.ProcessId = message.ProcessId;
-        server.UpdatedUtc = message.UpdatedUtc;
-
+        ServerCommand? command = null;
         if (message.CommandId is Guid commandId)
         {
-            var command = await db.ServerCommands.SingleOrDefaultAsync(x => x.Id == commandId, ct);
+            command = await db.ServerCommands.SingleOrDefaultAsync(x => x.Id == commandId, ct);
             if (command is not null)
             {
                 command.Status = string.IsNullOrWhiteSpace(message.Error) ? "Completed" : "Failed";
@@ -108,15 +106,43 @@ public sealed class AgentController : ControllerBase
             }
         }
 
+        server.Status = message.Status;
+        server.ProcessId = message.ProcessId;
+        server.UpdatedUtc = message.UpdatedUtc;
+
+        if (string.Equals(message.Status, "Running", StringComparison.OrdinalIgnoreCase))
+        {
+            server.StartedUtc ??= message.UpdatedUtc;
+        }
+        else if (string.Equals(message.Status, "Stopped", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(message.Status, "Deleted", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(message.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            server.StartedUtc = null;
+        }
+
+        var deleteServer = string.IsNullOrWhiteSpace(message.Error)
+            && command is not null
+            && string.Equals(command.Type, "Delete", StringComparison.OrdinalIgnoreCase);
+
+        var serverId = server.Id;
+        var serverName = server.Name;
+        var updatedUtc = server.UpdatedUtc;
+
+        if (deleteServer)
+        {
+            db.Servers.Remove(server);
+        }
+
         await db.SaveChangesAsync(ct);
 
         await _statusNotifier.NotifyStatusChangedAsync(
             new ServerStatusChangedMessage(
-                server.Id,
-                server.Name,
-                server.Status,
-                server.ProcessId,
-                server.UpdatedUtc),
+                serverId,
+                serverName,
+                deleteServer ? "Deleted" : message.Status,
+                deleteServer ? null : message.ProcessId,
+                updatedUtc),
             ct);
 
         return Accepted();

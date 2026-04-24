@@ -98,7 +98,9 @@
 
     <MudItem xs="12" md="9">
         <ServerDashboardPanel ServerId="_selectedServerId"
-                              ConsoleLines="SelectedConsoleLines" />
+                              ConsoleLines="SelectedConsoleLines"
+                              OnServerDeleted="HandleServerDeleted"
+                              OnRefreshRequested="ReloadServersAsync" />
     </MudItem>
 </MudGrid>
 
@@ -132,6 +134,32 @@
         await SyncConsoleSubscriptionsAsync();
     }
 
+    private async Task ReloadServersAsync()
+    {
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleServerDeleted(Guid deletedServerId)
+    {
+        var existing = _servers.FirstOrDefault(x => x.Id == deletedServerId);
+        if (existing is not null)
+        {
+            _servers.Remove(existing);
+        }
+
+        _consoleLinesByServer.Remove(deletedServerId);
+        _subscribedServerIds.Remove(deletedServerId);
+
+        if (_selectedServerId == deletedServerId)
+        {
+            _selectedServerId = _servers.FirstOrDefault().Id;
+        }
+
+        await SyncConsoleSubscriptionsAsync();
+        await ReloadServersAsync();
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -151,7 +179,14 @@
                     _consoleLinesByServer[server.Id] = [];
             }
 
-            if (_servers.Count > 0 && (_selectedServerId is null || !_servers.Any(x => x.Id == _selectedServerId)))
+            var validIds = _servers.Select(x => x.Id).ToHashSet();
+            var consoleIdsToRemove = _consoleLinesByServer.Keys.Where(id => !validIds.Contains(id)).ToList();
+            foreach (var id in consoleIdsToRemove)
+            {
+                _consoleLinesByServer.Remove(id);
+            }
+
+            if (_servers.Count > 0 && (_selectedServerId is null || !_servers.Any(x => x.Id == _selectedServerId.Value)))
             {
                 _selectedServerId = _servers[0].Id;
             }
@@ -187,9 +222,34 @@
 
         _statusHub.On<ServerStatusChangedMessage>("ServerStatusChanged", async message =>
         {
+            if (string.Equals(message.Status, "Deleted", StringComparison.OrdinalIgnoreCase))
+            {
+                var existingDeleted = _servers.FirstOrDefault(x => x.Id == message.ServerId);
+                if (existingDeleted is not null)
+                {
+                    _servers.Remove(existingDeleted);
+                }
+
+                _consoleLinesByServer.Remove(message.ServerId);
+                _subscribedServerIds.Remove(message.ServerId);
+
+                if (_selectedServerId == message.ServerId)
+                {
+                    _selectedServerId = _servers.FirstOrDefault().Id;
+                }
+
+                await SyncConsoleSubscriptionsAsync();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
             var existing = _servers.FirstOrDefault(x => x.Id == message.ServerId);
             if (existing is null)
+            {
+                await LoadAsync();
+                await InvokeAsync(StateHasChanged);
                 return;
+            }
 
             var index = _servers.IndexOf(existing);
 
@@ -304,6 +364,8 @@
         "Starting" => Color.Info,
         "Restarting" => Color.Warning,
         "Stopping" => Color.Warning,
+        "Uninstalling" => Color.Warning,
+        "Deleting" => Color.Error,
         "Stopped" => Color.Default,
         _ => Color.Default
     };

@@ -42,6 +42,7 @@ else
                         Install
                     </MudButton>
 
+
                     <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="StartAsync">
                         Start
                     </MudButton>
@@ -52,6 +53,13 @@ else
 
                     <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopAsync">
                         Stop
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="UninstallAsync">
+                        Uninstall
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteAsync">
+                        Delete
                     </MudButton>
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">
@@ -77,13 +85,51 @@ else
             </MudItem>
 
             <MudItem xs="12" md="5">
+                @if (PrimaryMetadata.Count > 0)
+                {
+                    <MudPaper Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Connection Info</MudText>
+
+                        @foreach (var item in PrimaryMetadata)
+                        {
+                            <MudPaper Class="pa-3 mb-2" Outlined="true">
+                                <MudText Typo="Typo.caption">@item.Label</MudText>
+                                <MudText Typo="Typo.h5">@item.Value</MudText>
+                            </MudPaper>
+                        }
+                    </MudPaper>
+                }
+
+                @if (SecondaryMetadata.Count > 0)
+                {
+                    <MudPaper Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Plugin Details</MudText>
+
+                        <MudStack Spacing="1">
+                            @foreach (var item in SecondaryMetadata)
+                            {
+                                <MudText Typo="Typo.body2">@item.Label: @item.Value</MudText>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+
                 <MudPaper Class="pa-4 mb-4">
                     <MudText Typo="Typo.h6" Class="mb-2">Quick Status</MudText>
 
                     <MudStack Spacing="1">
                         <MudText Typo="Typo.body2">Status: @_details.Status</MudText>
                         <MudText Typo="Typo.body2">Node: @_details.NodeName</MudText>
+
+                        @if (ShowGenericAddressInfo)
+                        {
+                            <MudText Typo="Typo.body2">IP: @(_details.IpAddress ?? "-")</MudText>
+                            <MudText Typo="Typo.body2">Port: @FormatInt(_details.Port)</MudText>
+                            <MudText Typo="Typo.body2">Query Port: @FormatInt(_details.QueryPort)</MudText>
+                        }
+
                         <MudText Typo="Typo.body2">PID: @(_details.ProcessId?.ToString() ?? "-")</MudText>
+                        <MudText Typo="Typo.body2">Uptime: @FormatUptime(_details.StartedUtc)</MudText>
                     </MudStack>
                 </MudPaper>
 
@@ -96,13 +142,48 @@ else
 @code {
     [Parameter] public Guid? ServerId { get; set; }
     [Parameter] public IReadOnlyList<string> ConsoleLines { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback<Guid> OnServerDeleted { get; set; }
+    [Parameter] public EventCallback OnRefreshRequested { get; set; }
 
     private ServerDetailsDto? _details;
     private Guid? _loadedServerId;
     private HubConnection? _statusHub;
+    private PeriodicTimer? _uptimeTimer;
+    private CancellationTokenSource? _uptimeCts;
+    private Task? _uptimeTask;
 
     private string? _error;
     private string? _message;
+    private IReadOnlyList<ServerMetadataItemDto> PrimaryMetadata =>
+    _details?.PluginMetadata.Where(x => x.Highlight).ToList() ?? [];
+
+    private IReadOnlyList<ServerMetadataItemDto> SecondaryMetadata =>
+        _details?.PluginMetadata.Where(x => !x.Highlight).ToList() ?? [];
+
+    private bool ShowGenericAddressInfo =>
+        PrimaryMetadata.Count == 0;
+    protected override async Task OnInitializedAsync()
+    {
+        _uptimeCts = new CancellationTokenSource();
+        _uptimeTimer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+
+        _uptimeTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (await _uptimeTimer.WaitForNextTickAsync(_uptimeCts.Token))
+                {
+                    if (_details is not null && _details.StartedUtc is not null)
+                    {
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        });
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -140,12 +221,25 @@ else
 
         _statusHub.On<ServerStatusChangedMessage>("ServerStatusChanged", async message =>
         {
-            if (_details is null || _loadedServerId is null || message.ServerId != _loadedServerId.Value)
+            if (_loadedServerId is null || message.ServerId != _loadedServerId.Value)
                 return;
+            if (string.Equals(message.Status, "Deleted", StringComparison.OrdinalIgnoreCase))
+            {
+                var deletedId = message.ServerId;
 
-            _details.Status = message.Status;
-            _details.ProcessId = message.ProcessId;
+                _details = null;
+                _loadedServerId = null;
 
+                if (OnRefreshRequested.HasDelegate)
+                    await OnRefreshRequested.InvokeAsync();
+
+                if (OnServerDeleted.HasDelegate)
+                    await OnServerDeleted.InvokeAsync(deletedId);
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+            await LoadDetailsAsync();
             await InvokeAsync(StateHasChanged);
         });
 
@@ -161,6 +255,11 @@ else
         }
 
         _details = await Api.GetServerDetailsAsync(_loadedServerId.Value);
+
+        if (_details is null)
+        {
+            _loadedServerId = null;
+        }
     }
 
     private async Task SaveAsync()
@@ -174,6 +273,7 @@ else
         try
         {
             await Api.SaveServerSettingsAsync(_details.Id, _details.Settings);
+            await LoadDetailsAsync();
             _message = "Settings saved.";
         }
         catch (Exception ex)
@@ -193,13 +293,31 @@ else
         try
         {
             await Api.InstallAsync(_loadedServerId.Value);
+            await LoadDetailsAsync();
         }
         catch (Exception ex)
         {
             _error = ex.Message;
         }
     }
+    private async Task UninstallAsync()
+    {
+        if (_loadedServerId is null)
+            return;
 
+        _error = null;
+        _message = null;
+
+        try
+        {
+            await Api.UninstallAsync(_loadedServerId.Value);
+            await LoadDetailsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
     private async Task StartAsync()
     {
         if (_loadedServerId is null)
@@ -211,6 +329,7 @@ else
         try
         {
             await Api.StartAsync(_loadedServerId.Value);
+            await LoadDetailsAsync();
         }
         catch (Exception ex)
         {
@@ -229,6 +348,7 @@ else
         try
         {
             await Api.StopAsync(_loadedServerId.Value);
+            await LoadDetailsAsync();
         }
         catch (Exception ex)
         {
@@ -247,11 +367,65 @@ else
         try
         {
             await Api.RestartAsync(_loadedServerId.Value);
+            await LoadDetailsAsync();
         }
         catch (Exception ex)
         {
             _error = ex.Message;
         }
+    }
+    private async Task DeleteAsync()
+    {
+        if (_loadedServerId is null)
+            return;
+
+        _error = null;
+        _message = null;
+
+        var deletedId = _loadedServerId.Value;
+
+        try
+        {
+            await Api.DeleteAsync(deletedId);
+
+            _details = null;
+            _loadedServerId = null;
+            _message = "Delete queued.";
+
+            if (OnRefreshRequested.HasDelegate)
+                await OnRefreshRequested.InvokeAsync();
+
+            if (OnServerDeleted.HasDelegate)
+                await OnServerDeleted.InvokeAsync(deletedId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static string FormatInt(int? value)
+        => value?.ToString() ?? "-";
+
+    private static string FormatUptime(DateTimeOffset? startedUtc)
+    {
+        if (startedUtc is null)
+            return "-";
+
+        var uptime = DateTimeOffset.UtcNow - startedUtc.Value;
+        if (uptime.TotalSeconds < 0)
+            return "-";
+
+        if (uptime.TotalDays >= 1)
+            return $"{(int)uptime.TotalDays}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+
+        if (uptime.TotalHours >= 1)
+            return $"{uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+
+        if (uptime.TotalMinutes >= 1)
+            return $"{uptime.Minutes}m {uptime.Seconds}s";
+
+        return $"{uptime.Seconds}s";
     }
 
     private static Color GetStatusColor(string status) => status switch
@@ -266,6 +440,28 @@ else
 
     public async ValueTask DisposeAsync()
     {
+        try
+        {
+            _uptimeCts?.Cancel();
+        }
+        catch
+        {
+        }
+
+        _uptimeTimer?.Dispose();
+        _uptimeCts?.Dispose();
+
+        if (_uptimeTask is not null)
+        {
+            try
+            {
+                await _uptimeTask;
+            }
+            catch
+            {
+            }
+        }
+
         if (_statusHub is not null)
         {
             await _statusHub.DisposeAsync();

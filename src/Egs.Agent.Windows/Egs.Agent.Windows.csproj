@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,5 +15,13 @@
   <ItemGroup>
     <ProjectReference Include="..\Egs.Agent.Abstractions\Egs.Agent.Abstractions.csproj" />
     <ProjectReference Include="..\Egs.Contracts\Egs.Contracts.csproj" />
+    <ProjectReference Include="..\Egs.PluginSdk\Egs.PluginSdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\plugins\**\*">
+      <Link>plugins\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

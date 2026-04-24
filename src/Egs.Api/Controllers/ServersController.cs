@@ -33,18 +33,18 @@ public sealed class ServersController : ControllerBase
         return server is null ? NotFound() : Ok(server);
     }
 
-    [HttpPut("{id:guid}/settings")]
-    public async Task<IActionResult> UpdateSettings(Guid id, [FromBody] ServerSettingsDto settings, CancellationToken ct)
-    {
-        await _serverService.UpdateSettingsAsync(id, settings, ct);
-        return NoContent();
-    }
-
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServerRequest request, CancellationToken ct)
     {
         var id = await _serverService.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
+    }
+
+    [HttpPut("{id:guid}/settings")]
+    public async Task<IActionResult> UpdateSettings(Guid id, [FromBody] ServerSettingsDto settings, CancellationToken ct)
+    {
+        await _serverService.UpdateSettingsAsync(id, settings, ct);
+        return NoContent();
     }
 
     [HttpPost("{id:guid}/install")]
@@ -72,6 +72,20 @@ public sealed class ServersController : ControllerBase
     public async Task<IActionResult> Restart(Guid id, CancellationToken ct)
     {
         await _serverService.RestartAsync(id, ct);
+        return Accepted();
+    }
+
+    [HttpPost("{id:guid}/uninstall")]
+    public async Task<IActionResult> Uninstall(Guid id, CancellationToken ct)
+    {
+        await _serverService.UninstallAsync(id, ct);
+        return Accepted();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await _serverService.DeleteAsync(id, ct);
         return Accepted();
     }
 }

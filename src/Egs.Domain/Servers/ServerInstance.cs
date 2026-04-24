@@ -10,6 +10,9 @@ public sealed class ServerInstance
     public string Status { get; set; } = "Stopped";
     public int? ProcessId { get; set; }
     public string SettingsJson { get; set; } = "{}";
+
+    public DateTimeOffset? StartedUtc { get; set; }
+
     public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;
 }

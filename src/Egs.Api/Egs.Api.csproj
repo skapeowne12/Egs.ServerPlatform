@@ -19,6 +19,14 @@
     <ProjectReference Include="..\Egs.Application\Egs.Application.csproj" />
     <ProjectReference Include="..\Egs.Contracts\Egs.Contracts.csproj" />
     <ProjectReference Include="..\Egs.Infrastructure\Egs.Infrastructure.csproj" />
+    <ProjectReference Include="..\Egs.PluginSdk\Egs.PluginSdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\plugins\**\*">
+      <Link>plugins\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

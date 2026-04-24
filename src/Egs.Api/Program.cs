@@ -3,6 +3,7 @@ using Egs.Api.Realtime;
 using Egs.Application.Servers;
 using Egs.Infrastructure.Data;
 using Egs.Infrastructure.Servers;
+using Egs.PluginSdk;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+builder.Services.AddEgsPluginCatalog(builder.Configuration);
 
 var dataFolder = Path.Combine(builder.Environment.ContentRootPath, "data");
 Directory.CreateDirectory(dataFolder);

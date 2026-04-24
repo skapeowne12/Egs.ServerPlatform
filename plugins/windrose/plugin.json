@@ -1,0 +1,178 @@
+{
+  "key": "windrose",
+  "displayName": "Windrose Dedicated Server",
+  "description": "SteamCMD-based Windrose dedicated server plugin. Installs the free dedicated server tool, bootstraps the config files on first install, and updates safe ServerDescription.json fields from plugin settings.",
+  "defaultInstallPathTemplate": "{server.gameKeySafe}/{server.nameSafe}-{server.idShort}",
+  "installer": {
+    "type": "steamcmd",
+    "steamAppId": "4129620",
+    "loginMode": "anonymous-first",
+    "validateOnInstall": true
+  },
+  "runtime": {
+    "executablePath": "{server.installDirectory}/WindroseServer.exe",
+    "workingDirectory": "{server.installDirectory}",
+    "argumentsTemplate": "{settings.additionalArgs}",
+    "readiness": {
+      "stdoutContains": [],
+      "timeoutSeconds": 0
+    },
+    "stop": {
+      "mode": "kill-process-tree",
+      "gracePeriodSeconds": 20
+    }
+  },
+  "requirements": [
+    {
+      "type": "networking",
+      "message": "Windrose uses invite codes and dynamic NAT punch-through rather than fixed manual game/query ports."
+    },
+    {
+      "type": "hosting",
+      "message": "Windows dedicated server plugin using SteamCMD app 4129620."
+    }
+  ],
+  "setup": [
+    {
+      "stage": "afterInstall",
+      "type": "runProcessUntilFileExists",
+      "executablePath": "{server.installDirectory}/WindroseServer.exe",
+      "workingDirectory": "{server.installDirectory}",
+      "argumentsTemplate": "",
+      "waitForPath": "{server.installDirectory}/R5/ServerDescription.json",
+      "timeoutSeconds": 45
+    },
+    {
+      "stage": "afterInstall",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.ServerName",
+      "value": "{settings.serverName}"
+    },
+    {
+      "stage": "afterInstall",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.IsPasswordProtected",
+      "value": "{settings.passwordProtected}"
+    },
+    {
+      "stage": "afterInstall",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.Password",
+      "value": "{settings.password}"
+    },
+    {
+      "stage": "afterInstall",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.MaxPlayerCount",
+      "value": "{settings.maxPlayerCount}"
+    },
+    {
+      "stage": "beforeStart",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.ServerName",
+      "value": "{settings.serverName}",
+      "ignoreIfMissing": true
+    },
+    {
+      "stage": "beforeStart",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.IsPasswordProtected",
+      "value": "{settings.passwordProtected}",
+      "ignoreIfMissing": true
+    },
+    {
+      "stage": "beforeStart",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.Password",
+      "value": "{settings.password}",
+      "ignoreIfMissing": true
+    },
+    {
+      "stage": "beforeStart",
+      "type": "setJsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.MaxPlayerCount",
+      "value": "{settings.maxPlayerCount}",
+      "ignoreIfMissing": true
+    }
+  ],
+  "metadata": [
+    {
+      "key": "inviteCode",
+      "label": "Invite Code",
+      "type": "jsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.InviteCode",
+      "highlight": true
+    },
+    {
+      "key": "serverName",
+      "label": "Server Name",
+      "type": "jsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.ServerName"
+    },
+    {
+      "key": "maxPlayerCount",
+      "label": "Max Players",
+      "type": "jsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.MaxPlayerCount"
+    },
+    {
+      "key": "passwordProtected",
+      "label": "Password Protected",
+      "type": "jsonValue",
+      "path": "{server.installDirectory}/R5/ServerDescription.json",
+      "jsonPath": "$.ServerDescription_Persistent.IsPasswordProtected"
+    },
+    {
+      "key": "networkingMode",
+      "label": "Networking",
+      "type": "static",
+      "value": "Dynamic / NAT punch-through"
+    }
+  ],
+  "defaultSettings": {
+    "serverName": "EGS Windrose",
+    "passwordProtected": false,
+    "password": "",
+    "maxPlayerCount": 4,
+    "additionalArgs": ""
+  },
+  "settingsSchema": {
+    "type": "object",
+    "properties": {
+      "serverName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "passwordProtected": {
+        "type": "boolean"
+      },
+      "password": {
+        "type": "string"
+      },
+      "maxPlayerCount": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10
+      },
+      "additionalArgs": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "serverName",
+      "passwordProtected",
+      "maxPlayerCount"
+    ]
+  }
+}

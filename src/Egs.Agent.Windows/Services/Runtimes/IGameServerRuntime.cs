@@ -7,6 +7,7 @@ public interface IGameServerRuntime
 {
     bool CanHandle(string gameKey);
     Task InstallAsync(AgentServerDefinitionMessage server, Func<string, Task> writeLineAsync, CancellationToken ct);
+    Task UninstallAsync(AgentServerDefinitionMessage server, Func<string, Task> writeLineAsync, CancellationToken ct);
     Task<Process> StartAsync(AgentServerDefinitionMessage server, Func<string, Task> writeLineAsync, CancellationToken ct);
     Task StopAsync(AgentServerDefinitionMessage server, Process process, Func<string, Task> writeLineAsync, CancellationToken ct);
 }

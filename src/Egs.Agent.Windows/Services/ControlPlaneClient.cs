@@ -31,7 +31,7 @@ public sealed class ControlPlaneClient
     public async Task<AgentServerDefinitionMessage> GetServerDefinitionAsync(Guid serverId, CancellationToken ct)
     {
         var response = await _httpClient.GetFromJsonAsync<AgentServerDefinitionMessage>(
-            $"api/agent/servers/{serverId:guid}",
+            $"api/agent/servers/{serverId:D}",
             ct);
 
         return response ?? throw new InvalidOperationException($"Server '{serverId}' was not returned by the API.");

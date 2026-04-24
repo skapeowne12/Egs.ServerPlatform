@@ -1,4 +1,7 @@
-﻿@using Egs.Contracts.Servers
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using Egs.Contracts.Servers
+@using MudBlazor
 
 @if (Details is not null)
 {
@@ -29,6 +32,31 @@
                                Color="Color.Primary"
                                Label="Auto Update" />
                 </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Plugin">
+            <MudGrid Spacing="3">
+                <MudItem xs="12">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Edit plugin-specific settings as raw JSON. Save Settings in the dashboard to persist changes.
+                    </MudText>
+
+                    <MudTextField T="string"
+                                  Value="@_pluginJson"
+                                  ValueChanged="@OnPluginJsonChanged"
+                                  Label="Plugin Settings JSON"
+                                  Variant="Variant.Outlined"
+                                  Lines="14"
+                                  Immediate="true" />
+                </MudItem>
+
+                @if (!string.IsNullOrWhiteSpace(_pluginJsonError))
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Error" Dense="true">@_pluginJsonError</MudAlert>
+                    </MudItem>
+                }
             </MudGrid>
         </MudTabPanel>
 
@@ -106,5 +134,59 @@
 }
 
 @code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    private Guid? _lastServerId;
+    private string _pluginJson = "{}";
+    private string? _pluginJsonError;
+
     [Parameter] public ServerDetailsDto? Details { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Details is null)
+        {
+            _lastServerId = null;
+            _pluginJson = "{}";
+            _pluginJsonError = null;
+            return;
+        }
+
+        if (_lastServerId != Details.Id)
+        {
+            _lastServerId = Details.Id;
+            _pluginJson = JsonSerializer.Serialize(Details.Settings.Plugin ?? new JsonObject(), JsonOptions);
+            _pluginJsonError = null;
+        }
+    }
+
+    private Task OnPluginJsonChanged(string value)
+    {
+        _pluginJson = value;
+
+        if (Details is null)
+            return Task.CompletedTask;
+
+        try
+        {
+            var parsed = JsonNode.Parse(string.IsNullOrWhiteSpace(value) ? "{}" : value) as JsonObject;
+            if (parsed is null)
+            {
+                _pluginJsonError = "Plugin settings JSON must be a JSON object.";
+                return Task.CompletedTask;
+            }
+
+            Details.Settings.Plugin = parsed;
+            _pluginJsonError = null;
+        }
+        catch (JsonException ex)
+        {
+            _pluginJsonError = ex.Message;
+        }
+
+        return Task.CompletedTask;
+    }
 }

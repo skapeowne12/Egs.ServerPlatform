@@ -1,4 +1,6 @@
-﻿namespace Egs.Contracts.Servers;
+using System.Text.Json.Nodes;
+
+namespace Egs.Contracts.Servers;
 
 public sealed class ServerSettingsDto
 {
@@ -6,8 +8,7 @@ public sealed class ServerSettingsDto
     public bool AutoStart { get; set; }
     public bool AutoRestart { get; set; }
     public bool AutoUpdate { get; set; }
-
     public DiscordBotSettingsDto DiscordBot { get; set; } = new();
     public CpuSettingsDto Cpu { get; set; } = new();
-    public ValheimServerSettingsDto Valheim { get; set; } = new();
+    public JsonObject Plugin { get; set; } = new JsonObject();
 }

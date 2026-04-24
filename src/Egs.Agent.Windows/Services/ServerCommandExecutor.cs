@@ -41,6 +41,14 @@ public sealed class ServerCommandExecutor
                     await PostStatusAsync(command.CommandId, server.Id, "Stopped", null, null, ct);
                     break;
 
+                case ServerCommandType.Uninstall:
+                    await UninstallAsync(command, server, runtime, deleteAfter: false, ct);
+                    break;
+
+                case ServerCommandType.Delete:
+                    await UninstallAsync(command, server, runtime, deleteAfter: true, ct);
+                    break;
+
                 case ServerCommandType.Start:
                     await StartAsync(command, server, runtime, ct);
                     break;
@@ -70,6 +78,8 @@ public sealed class ServerCommandExecutor
             var fallbackStatus = command.Type switch
             {
                 ServerCommandType.Install => "InstallFailed",
+                ServerCommandType.Uninstall => "Stopped",
+                ServerCommandType.Delete => "Stopped",
                 ServerCommandType.Start => "Stopped",
                 ServerCommandType.Stop => "Running",
                 ServerCommandType.Restart => "Stopped",
@@ -84,6 +94,36 @@ public sealed class ServerCommandExecutor
 
             await PostStatusAsync(command.CommandId, server.Id, fallbackStatus, fallbackProcessId, ex.Message, ct);
         }
+    }
+
+    private async Task UninstallAsync(
+        ServerCommandMessage command,
+        AgentServerDefinitionMessage server,
+        IGameServerRuntime runtime,
+        bool deleteAfter,
+        CancellationToken ct)
+    {
+        var process = ResolveTrackedOrExistingProcess(server);
+        if (process is not null && !process.HasExited)
+        {
+            await EmitLineAsync(server.Id, $"[{command.Type}] Server is running; stopping before uninstall.", ct);
+            await runtime.StopAsync(server, process, line => EmitLineAsync(server.Id, line, CancellationToken.None), ct);
+
+            try
+            {
+                await process.WaitForExitAsync(ct);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            _trackedProcesses.TryRemove(server.Id, out _);
+        }
+
+        await runtime.UninstallAsync(server, line => EmitLineAsync(server.Id, line, ct), ct);
+
+        var finalStatus = deleteAfter ? "Deleted" : "Stopped";
+        await PostStatusAsync(command.CommandId, server.Id, finalStatus, null, null, ct);
     }
 
     private async Task StartAsync(
@@ -130,9 +170,7 @@ public sealed class ServerCommandExecutor
             await EmitLineAsync(server.Id, "[Stop] Server is not running.", ct);
 
             if (updateCommandStatus)
-            {
                 await PostStatusAsync(command.CommandId, server.Id, "Stopped", null, null, ct);
-            }
 
             return;
         }
@@ -145,15 +183,12 @@ public sealed class ServerCommandExecutor
         }
         catch (InvalidOperationException)
         {
-            // Process already exited.
         }
 
         _trackedProcesses.TryRemove(server.Id, out _);
 
         if (updateCommandStatus)
-        {
             await PostStatusAsync(command.CommandId, server.Id, "Stopped", null, null, ct);
-        }
     }
 
     private async Task OnProcessExitedAsync(AgentServerDefinitionMessage server, Process process)
@@ -179,24 +214,16 @@ public sealed class ServerCommandExecutor
     private Process? ResolveTrackedOrExistingProcess(AgentServerDefinitionMessage server)
     {
         if (_trackedProcesses.TryGetValue(server.Id, out var trackedProcess))
-        {
             return trackedProcess;
-        }
 
         if (server.ProcessId is not int processId)
-        {
             return null;
-        }
 
         try
         {
             return Process.GetProcessById(processId);
         }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-        catch (InvalidOperationException)
+        catch
         {
             return null;
         }

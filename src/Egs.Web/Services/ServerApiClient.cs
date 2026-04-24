@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
 using Egs.Contracts.Servers;
 
 namespace Egs.Web.Services;
@@ -18,11 +19,27 @@ public sealed class ServerApiClient
         return result ?? [];
     }
 
-    public Task<ServerSummaryDto?> GetServerAsync(Guid id, CancellationToken ct = default)
-        => _httpClient.GetFromJsonAsync<ServerSummaryDto>($"api/servers/{id}", ct);
+    public async Task<ServerSummaryDto?> GetServerAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/servers/{id}", ct);
 
-    public Task<ServerDetailsDto?> GetServerDetailsAsync(Guid id, CancellationToken ct = default)
-        => _httpClient.GetFromJsonAsync<ServerDetailsDto>($"api/servers/{id}/details", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ServerSummaryDto>(cancellationToken: ct);
+    }
+
+    public async Task<ServerDetailsDto?> GetServerDetailsAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await _httpClient.GetAsync($"api/servers/{id}/details", ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ServerDetailsDto>(cancellationToken: ct);
+    }
 
     public async Task SaveServerSettingsAsync(Guid id, ServerSettingsDto settings, CancellationToken ct = default)
     {
@@ -57,6 +74,18 @@ public sealed class ServerApiClient
     public async Task RestartAsync(Guid id, CancellationToken ct = default)
     {
         var response = await _httpClient.PostAsync($"api/servers/{id}/restart", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UninstallAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsync($"api/servers/{id}/uninstall", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _httpClient.DeleteAsync($"api/servers/{id}", ct);
         response.EnsureSuccessStatusCode();
     }
 }
