@@ -1,10 +1,19 @@
 using Egs.Agent.Windows.Services;
 using Egs.Agent.Windows.Services.Runtimes;
+using Egs.Contracts.Cloud;
 using Egs.PluginSdk;
+using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddEgsPluginCatalog(builder.Configuration);
+builder.Services.AddHttpClient<CloudControlClient>((services, client) =>
+{
+    var options = services.GetRequiredService<IOptions<CloudControlOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+});
+builder.Services.Configure<CloudControlOptions>(
+    builder.Configuration.GetSection("CloudControl"));
 
 builder.Services.AddHttpClient<ControlPlaneClient>(client =>
 {
