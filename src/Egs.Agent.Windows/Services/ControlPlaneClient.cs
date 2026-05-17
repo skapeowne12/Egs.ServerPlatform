@@ -3,6 +3,7 @@ using Egs.Agent.Abstractions.Commands;
 using Egs.Agent.Abstractions.Console;
 using Egs.Agent.Abstractions.Servers;
 using Egs.Agent.Abstractions.Status;
+using Egs.Contracts.Servers;
 
 namespace Egs.Agent.Windows.Services;
 
@@ -26,6 +27,15 @@ public sealed class ControlPlaneClient
             ct);
 
         return response?.Commands ?? [];
+    }
+
+    public async Task<IReadOnlyList<ServerSummaryDto>> GetServersAsync(CancellationToken ct)
+    {
+        var response = await _httpClient.GetFromJsonAsync<List<ServerSummaryDto>>(
+            "api/servers",
+            ct);
+
+        return response ?? [];
     }
 
     public async Task<AgentServerDefinitionMessage> GetServerDefinitionAsync(Guid serverId, CancellationToken ct)

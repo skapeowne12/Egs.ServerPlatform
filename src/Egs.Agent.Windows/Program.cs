@@ -6,7 +6,13 @@ using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.Services.AddWindowsService(options =>
+{
+    options.ServiceName = "EGS Windows Agent";
+});
+
 builder.Services.AddEgsPluginCatalog(builder.Configuration);
+builder.Services.AddSingleton<CloudControlState>();
 builder.Services.AddHttpClient<CloudControlClient>((services, client) =>
 {
     var options = services.GetRequiredService<IOptions<CloudControlOptions>>().Value;

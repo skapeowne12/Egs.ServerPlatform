@@ -114,4 +114,71 @@ public sealed class CloudControlClient
             request.Name,
             request.Status);
     }
+    public async Task<IReadOnlyList<CloudServerCommandDto>> PollCommandsAsync(CancellationToken ct)
+    {
+        if (_nodeId is null)
+        {
+            _logger.LogDebug("Skipping cloud command poll because node has not heartbeated yet.");
+            return Array.Empty<CloudServerCommandDto>();
+        }
+
+        using var response = await _httpClient.GetAsync(
+            $"api/node/{_nodeId.Value}/commands",
+            ct);
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "Cloud command poll failed. NodeId={NodeId}, StatusCode={StatusCode}, Body={Body}",
+                _nodeId.Value,
+                response.StatusCode,
+                body);
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        return JsonSerializer.Deserialize<List<CloudServerCommandDto>>(body, JsonOptions)
+            ?? new List<CloudServerCommandDto>();
+    }
+
+    public async Task UpdateCommandStatusAsync(
+        Guid commandId,
+        string status,
+        string? resultJson,
+        string? errorMessage,
+        CancellationToken ct)
+    {
+        var request = new UpdateCloudCommandStatusRequest(
+            status,
+            resultJson,
+            errorMessage);
+
+        var json = JsonSerializer.Serialize(request, JsonOptions);
+
+        using var content = new StringContent(
+            json,
+            Encoding.UTF8,
+            "application/json");
+
+        using var response = await _httpClient.PostAsync(
+            $"api/node/commands/{commandId}/status",
+            content,
+            ct);
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "Cloud command status update failed. CommandId={CommandId}, Status={Status}, StatusCode={StatusCode}, Body={Body}",
+                commandId,
+                status,
+                response.StatusCode,
+                body);
+
+            response.EnsureSuccessStatusCode();
+        }
+    }
 }
